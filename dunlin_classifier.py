@@ -1,26 +1,29 @@
 #!/usr/bin/env python
-# TODO change shebang/make stand alone exe
+# TODO make stand alone exe
 """
-the goal is to take a video of a dunlin in the wild and classify its behavior
+The Dunlin Classifier was developed for generating behaviour time-series from videos featuring dunlins.
+The program produces a csv file containing predictions, prediction scores, and pixel coordinates for dunlins found in
+frames.
+
+Autor: Antsje van der Leij
 """
+import logging
+logging.basicConfig(level=logging.WARNING)
+
 import csv
 # imports
 import os
 import sys
 import argparse
 import numpy as np
-import logging
-import subprocess
 
+import subprocess
 import pandas as pd
 import cv2
 import tensorflow as tf
-from keras.preprocessing import image
 
 from dunlin_classifier.SLEAP_model import SLEAPModel
 from dunlin_classifier.SLEAP_parser import SleapParser
-
-logging.basicConfig(level=logging.INFO)
 
 
 class DunlinClassifier:
@@ -29,8 +32,6 @@ class DunlinClassifier:
         args = self.get_args()
         self.video_dir = args.video_dir
         self.frame_step = args.frame_step
-        # TODO remove hard coded
-        self.boris_files = "/export/lv9/user/avdleij/boris_files/"
 
         if args.output_dir:
             self.output_dir = args.output_dir
@@ -92,11 +93,8 @@ class DunlinClassifier:
         """
         Saves a copy of the input video at the standard size of 1920X1080p
         Does not upscale and adds black bars to keep original aspect ratio.
-        https://superuser.com/questions/547296/resizing-videos-with-ffmpeg-avconv-to-fit-into-static-sized-player/1136305#1136305
-        https://trac.ffmpeg.org/wiki/Scaling
 
         :param video_name:
-        :param output_dir:
         :return:
         """
         # path to video
@@ -105,12 +103,12 @@ class DunlinClassifier:
         logging.info(f"rescale videos are saved at: {self.rescale_output}")
 
         # if output dir doesn't exist, create it
-        if not os.path.isdir(self.temp_dir):
-            os.makedirs(self.temp_dir)
+        if not os.path.isdir(self.rescale_output):
+            os.makedirs(self.rescale_output)
             logging.debug("made a new directory for rescaled videos")
 
         # save location and name of rescaled video
-        ffmpeg_output = self.temp_dir + video_name
+        ffmpeg_output = self.rescale_output + video_name
 
         # ffmpeg command for rescaling a video to 1980p and adding black bars to retain original aspect ratio
         command = [
@@ -125,61 +123,14 @@ class DunlinClassifier:
         # runs command
         subprocess.run(command)
 
-    def reindex_video(self, video_name):
-        """
-        Runs a ffmpeg comand to reindex vidoes that have been rescaled.
-        This prevents index errors and shifting coordinates.
-        :param video_name:
-        :return:
-        """
-
-        # path to video
-        video = self.temp_dir + video_name
-
-        logging.info(f"reindx videos are saved at: {self.rescale_output}")
-
-        if not os.path.isdir(self.rescale_output):
-            os.makedirs(self.rescale_output)
-            logging.debug("made a new directory for rescaled videos")
-
-        # save location and name of rescaled video
-        ffmpeg_output = self.rescale_output + video_name
-        print("ran into error while indexing video: " + video)
-        print("Attempting to fix it. please wait...")
-        subprocess.run(
-            ["ffmpeg", "-y", "-i", video, "-c:v", "libx264", "-pix_fmt", "yuv420p",
-             "-preset", "superfast", "-crf", "23", ffmpeg_output])
-
-
-    def create_conda_environment(self, env_name, requirements_file):
-        """
-        activates a conda env and if it doesn't exist, creates it
-        :param env_name:
-        :param requirements_file:
-        :return:
-        """
-        # TODO check if still needed
-        # Example usage:
-        # create_conda_environment("env1", "requirements.txt")
-        env_exists = False
-        try:
-            subprocess.run(f"conda activate {env_name} ", shell=True, check=True)
-            env_exists = True
-        except subprocess.CalledProcessError as e:
-            pass
-
-        if not env_exists:
-            subprocess.run(f"conda create --name {env_name} --file {requirements_file}", shell=True)
-            print(f"Conda environment {env_name} created.")
-        else:
-            print(f"Conda environment {env_name} already exists.")
-
     def run_sleap(self):
         """
         initiates a SLEAP model and runs interferes over all videos in the directory
+
         :return:
         """
         sleap_model = SLEAPModel(self.rescale_output)
+        print(self.rescale_output)
         # run sleap inference on video
         sleap_model.predict(self.output_dir)
 
@@ -196,15 +147,23 @@ class DunlinClassifier:
             df = sleap_parser.sleap_to_pandas(sleap_prediction_path + file)
             df.to_csv(self.output_dir + "sleap_csv/" + file.replace(".slp", ".csv"))
 
+    # TODO function is way to long, needs work
     def crop_frame(self, video_name):
+        """
+        creates small images of dunlin by getting the pixel coordinates from the sleap model and then cropping
+        the image around said coordinates.
+        :param video_name: string containing the video name
+        :return:
+        """
+
+        print(f"isolating dunlin from frames for {video_name}...")
 
         # add video as key for results dict
         self.result_dict[video_name] = {}
-        # make list to track frames
+        # TODO feedback to user how many frame done/to go
 
         # get file name
         video = self.rescale_output + video_name
-
         video_id = video_name.replace(".mp4", "")
 
         # get sleap dataframe
@@ -214,42 +173,59 @@ class DunlinClassifier:
         if not os.path.exists(self.output_dir + "cropped_frames/" + video_id + "/"):
             os.makedirs(self.output_dir + "cropped_frames/" + video_id + "/")
 
+        # open video
         video = cv2.VideoCapture(video)
-        logging.info(f"video = {video}")
+        # get total amount of frames
+        total_frames = video.get(cv2.CAP_PROP_FRAME_COUNT)
+        print(f"{video_id} has {total_frames} frames")
+
+        # check if first frame can be opened
         success, image = video.read()
         count = 1
-        # get frames form video
-        while success:
-            logging.debug(f"frame number = {count}")
-            if count % self.frame_step != 0:
-                success, image = video.read()
 
+        # get frames from video as long as the next frame can be accessed
+        while success:
+
+            logging.debug(f"frame number = {count}")
+            logging.debug(f"frame step = {self.frame_step}")
+            logging.debug(count % self.frame_step)
+
+            # crop frames in a set interval
+            if count % self.frame_step != 0:
                 count += 1
-                continue
+                # don't do anything and got to the next frame
+
             else:
+                # prepare dict
                 frame_dict = {}
                 self.result_dict[video_name][count] = frame_dict
 
-                # get sleap data for this video frame
+                # get SLEAP data for this video frame
                 frame_rows = sleap_df.loc[sleap_df["frame_idx"] == count]
-                # check if sleap model found a positive
+
+                # logging
+                logging.debug("frame_rows =")
+                logging.debug(frame_rows)
+
+                # check if SLEAP found an instance
                 if frame_rows.empty:
                     frame_dict["sleap_hit"] = False
                 else:
                     frame_dict["sleap_hit"] = True
 
+                # reset index
                 frame_rows = frame_rows.reset_index()
                 height, width, channels = image.shape
                 logging.debug(f"height - {height}")
                 logging.debug(f"width = {width}")
-                logging.debug(f"done with frame {count}")
 
+                # if only one instance is found in this frame the result will be a data array, not a data frame
                 if len(frame_rows.index) == 1:
 
-                    index = 0
+                    # prepare dict
                     instance_dict = {}
 
-                    # save prediction score
+                    # get prediction score
                     sleap_score = frame_rows["score"]
                     sleap_score = sleap_score.tolist()[0]
                     instance_dict["sleap_score"] = sleap_score
@@ -269,19 +245,20 @@ class DunlinClassifier:
                     y_start = y - 70
                     y_end = y + 70
 
-                    logging.info(f"center coordinalts = x: {x} and y: {y}")
-
-                    logging.debug("crop frame borders sizes")
+                    # logging
+                    logging.info(f"center coordinates = x: {x} and y: {y}")
+                    logging.debug("crop frame borders points")
                     logging.debug(f"x start = {x_start}")
                     logging.debug(f"y start = {y_start}")
                     logging.debug(f"x end = {x_end}")
                     logging.debug(f"y end = {y_end}")
 
-                    # crop frame around bird
+                    # crop frame around dunlin
                     crop_frame = image[y_start:y_end, x_start: x_end]
                     logging.info(f"frame{count}.jpg in {self.output_dir} + cropped_frames/ + {video_id}")
+
                     try:
-                        # save croped frame as jpeg
+                        # save cropped frame as jpeg
                         write_success = cv2.imwrite(
                             self.output_dir + "cropped_frames/" + video_id + "/" + fr"frame_{count}.jpg",
                             crop_frame)
@@ -289,10 +266,12 @@ class DunlinClassifier:
                     except Exception as e:
                         print(e)
 
-                    frame_dict[index] = instance_dict
+                    # save results in dict
+                    frame_dict[0] = instance_dict
 
+                # TODO lots of duplicate code
+                # if more than 1 instance is found, treat as dataframe
                 else:
-
                     for index in frame_rows.index:
 
                         instance_dict = {}
@@ -334,19 +313,31 @@ class DunlinClassifier:
                         frame_dict[index] = instance_dict
                 count += 1
 
+            # logging
+            logging.debug(f"done with frame {count}")
+            logging.debug(f"image {count} out of {total_frames}")
+            logging.debug(f"succes = {success}")
+            # check next frame
+            success, image = video.read()
+
     def run_keras(self, video):
+        """
+        runs a keras image classification model and save the results in a dictionary
+        :param video: str
+        :return:
+        """
 
         # classes
-        class_names = ["foraging", "no bird", "open wings", "self care", "sleeping", "unknown", "vigilant"]
+        class_names = ["empty", "foraging", "non_foraging"]
 
         # load model
-        model = tf.keras.models.load_model('dunlin_classifier/my_model.keras')
+        model = tf.keras.models.load_model('models/Keras_model/3class_dunlin.keras')
         print(model.summary())
 
+        # get video ID
         video_id = video.replace(".mp4", "")
         labeled_predictions_list = []
         prediction_score_list = []
-
 
         video_dict = self.result_dict[video]
 
@@ -354,6 +345,7 @@ class DunlinClassifier:
         img_dir = self.output_dir + "cropped_frames/" + video_id
 
         for img in self.get_files_from_dir(img_dir, ".jpg"):
+
             # load img
             loaded_img = tf.keras.utils.load_img(img_dir + "/" + img, target_size=(140, 180))
 
@@ -374,6 +366,7 @@ class DunlinClassifier:
             # save score in list
             prediction_score_list.append(score)
 
+            # get file name for cropped img
             img = img.replace(".jpg", "")
             img_split = img.split("_")
             frame_idx = img_split[1]
@@ -382,20 +375,34 @@ class DunlinClassifier:
             else:
                 instance_num = 0
 
+            logging.debug(f"frame idx = {frame_idx}")
 
-            video_dict[int(frame_idx)][instance_num]["label"] = labeled_pred
-            video_dict[int(frame_idx)][instance_num]["classification_score"] = score
+            # this triggers a key error sometimes, but I don't know why
+            # only happens sometimes when instance_num >= 1
+            # HPC issue?
+            try:
+                video_dict[int(frame_idx)][instance_num]["label"] = labeled_pred
+                video_dict[int(frame_idx)][instance_num]["classification_score"] = score
 
-            # TODO remove croped frames after classification
+            except KeyError:
+                logging.warning(f"KeyError at {img}")
+
+            # TODO add option to remove cropped frames after classification
 
     def write_results(self):
+        """
+        parses the result dictionary and saves it as a CSV file
+        :return:
+        """
 
         header = ["video", "frame", "instance", "sleap_score", "coordinate_bird_x",
                   "coordinate_bird_y", "label", "classification_score"]
 
         with open(self.output_dir + "output.csv", "wt") as fp:
             writer = csv.writer(fp, delimiter=",")
-            writer.writerow(header)  # write header
+            writer.writerow(header)
+
+            logging.debug(self.result_dict)
 
             for video in self.result_dict:
                 video_dict = self.result_dict[video]
@@ -408,11 +415,15 @@ class DunlinClassifier:
                             coordinate_bird_x = instance_dict.pop("coordinate_bird_x")
                             coordinate_bird_y = instance_dict.pop("coordinate_bird_y")
                             if instance_dict:
-                                label = instance_dict["label"]
-                                classification_score = instance_dict["classification_score"]
-                                row = [video, frame, instance, sleap_score, coordinate_bird_x,
-                                       coordinate_bird_y, label, classification_score]
-                                writer.writerow(row)
+                                try:
+
+                                    label = instance_dict["label"]
+                                    classification_score = instance_dict["classification_score"]
+                                    row = [video, frame, instance, sleap_score, coordinate_bird_x,
+                                           coordinate_bird_y, label, classification_score]
+                                    writer.writerow(row)
+                                except KeyError:
+                                    print("label error")
                             else:
                                 label = "no_hit"
                                 row = [video, frame, instance, sleap_score, coordinate_bird_x,
@@ -423,137 +434,32 @@ class DunlinClassifier:
                                None, "no_hit", None]
                         writer.writerow(row)
 
-    def classify_dunlin(self):
+    def annotate_videos(self):
+        """
+        complete pipline from video to CSV output
+        :return:
+        """
         # get all videos from input dir
         video_list = self.get_files_from_dir(self.video_dir, ".mp4")
         for video in video_list:
+            print(video)
             # rescale video
             self.rescale_video(video)
-            # reindex
-            self.reindex_video(video)
-            # for every video run sleap
+
+        # run sleap
+        print("running sleap")
         self.run_sleap()
         self.get_sleap_df()
 
         for video in video_list:
+            print(video)
             self.crop_frame(video)
             self.run_keras(video)
-        print("writhing results")
+        print("writhing results...")
         self.write_results()
 
-    def make_more_training_data(self):
-        video_list = self.get_files_from_dir(self.video_dir, ".mp4")
-        for video in video_list:
-            # rescale video
-            self.rescale_video(video)
-            # reindex
-            self.reindex_video(video)
-            # for every video run sleap
-        self.run_sleap()
-        self.get_sleap_df()
 
-        for video in video_list:
-            self.crop_frame(video)
-            self.model_assisted_labeling(video)
-
-    def model_assisted_labeling(self, video):
-        # TODO (re)move
-
-        # classes
-        class_names = ["foraging", "no bird", "open wings", "self care", "sleeping", "unknown", "vigilant"]
-
-        # load model
-        model = tf.keras.models.load_model('dunlin_classifier/my_model.keras')
-        print(model.summary())
-
-        video_id = video.replace(".mp4", "")
-
-        video_dict = self.result_dict[video]
-        print(video_dict)
-        # file were img to predict are stored
-        img_dir = self.output_dir + "cropped_frames/" + video_id
-
-        for img in self.get_files_from_dir(img_dir, ".jpg"):
-            # load img
-            loaded_img = tf.keras.utils.load_img(img_dir + "/" + img, target_size=(140, 180))
-
-            # convert to array for prediction
-            img_array = tf.keras.utils.img_to_array(loaded_img)
-            img_array = tf.expand_dims(img_array, 0)
-
-            # predict
-            pred = model.predict(img_array)
-
-            # get best scoring label
-            labeled_pred = class_names[np.argmax(pred[0], axis=-1)]
-
-            # get score of best scoring label
-            score = np.max(tf.nn.softmax(pred[0]))
-
-            # make dir for saving image
-            if not os.path.exists(self.output_dir + "model_assisted_labeling/"):
-                os.makedirs(self.output_dir + "model_assisted_labeling/")
-
-            for label in class_names:
-                if not os.path.exists(self.output_dir + "model_assisted_labeling/" + label + "/"):
-                    os.makedirs(self.output_dir + "model_assisted_labeling/" + label + "/")
-
-            open_img = cv2.imread(img_dir + "/" + img)
-
-            cv2.imwrite(self.output_dir + "model_assisted_labeling/" + labeled_pred + "/" + video_id + "_" + img, open_img)
-
-    def training_conf_mat(self):
-        print("making matrix")
-        true_labels = []
-        pred_labels = []
-        from sklearn.metrics import confusion_matrix
-
-        # classes
-        class_names = ["foraging", "no bird", "open wings", "self care", "sleeping", "unknown", "vigilant"]
-
-        # load model
-        model = tf.keras.models.load_model('dunlin_classifier/my_model.keras')
-        print(model.summary())
-
-        train_data = "/export/lv9/user/avdleij/currated_croped_training_img/catagories/sorted_labels/"
-        for name in class_names:
-            img_dir = train_data + name
-            for img in self.get_files_from_dir(img_dir, ".jpg"):
-                # load img
-                loaded_img = tf.keras.utils.load_img(img_dir + "/" + img, target_size=(140, 180))
-
-                # convert to array for prediction
-                img_array = tf.keras.utils.img_to_array(loaded_img)
-                img_array = tf.expand_dims(img_array, 0)
-
-                # predict
-                pred = model.predict(img_array)
-
-                # get best scoring label
-                labeled_pred = class_names[np.argmax(pred[0], axis=-1)]
-
-                true_labels.append(name)
-                pred_labels.append(labeled_pred)
-
-        result = confusion_matrix(true_labels, pred_labels, normalize='pred', labels=class_names)
-        print(result)
-        df_cm = pd.DataFrame(result, class_names, class_names)
-
-        df_cm.to_csv("train_conf_mat.csv")
-
-
-
-
-
-
-
-
-
-    # TODO clean up all temp files
-
-    # constants
-
-    # functions
+# TODO clean up all temp files
 
 
 # classes
@@ -564,9 +470,8 @@ def main():
     print("starting classifier...")
     # parse command line arguments
     dc = DunlinClassifier()
-    # dc.classify_dunlin()
-
-    dc.training_conf_mat()
+    dc.annotate_videos()
+    # dc.training_conf_mat()
 
 
 if __name__ == "__main__":
