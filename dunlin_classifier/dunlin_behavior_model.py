@@ -20,8 +20,7 @@ class DunlinBehaviorModelTrainer:
     """
 
     def __init__(self):
-
-        self.data_dir = pathlib.Path("/export/lv9/user/avdleij/currated_croped_training_img/catagories/sorted_labels").with_suffix('')
+        self.data_dir = ...  # path to dir with training images
         self.batch_size = 64
         self.img_height = 140
         self.img_width = 180
