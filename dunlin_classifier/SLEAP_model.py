@@ -68,7 +68,7 @@ class SLEAPModel:
         print("load model")
 
         # use glob to make a variable model path so name of model doesn't matter
-        model_path = glob.glob('models/*')
+        model_path = glob.glob('models/SLEAP_models/*')
         logging.debug(f"model loaded from: {model_path}")
 
         model = sleap.load_model(model_path)
@@ -101,7 +101,6 @@ class SLEAPModel:
         :param tracking: (boolean)
 
         """
-        slp_parser = SleapParser()
 
         videos = self.get_files_from_dir(self.video_dir, ".mp4")
         print(videos)
@@ -114,16 +113,16 @@ class SLEAPModel:
             save_name = video.replace(".mp4", "")
             save_name = save_name.replace(".MP4", "")
             sleap_video = self.load_video(self.video_dir + "/" + video)
-            
+
             # file path to save sleap predictions
             sleap_pred_dir = output_dir + "sleap_predictions/"
             slp_file = sleap_pred_dir + save_name + ".slp"
-            
+
             # make directory for sleap predictions one doesn't exist
             if not os.path.isdir(sleap_pred_dir):
                 os.makedirs(sleap_pred_dir)
                 logging.debug("made a new directory for sleap predictions")
-                
+
             # most common error is KeyError while indexing videos
             try:
                 labels = self.run_model(sleap_video)
