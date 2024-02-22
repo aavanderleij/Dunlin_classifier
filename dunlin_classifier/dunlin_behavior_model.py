@@ -15,6 +15,9 @@ from tensorflow.keras.models import Sequential
 
 
 class DunlinBehaviorModelTrainer:
+    """
+    Class for training and validating an image classification model
+    """
 
     def __init__(self):
 
@@ -24,6 +27,11 @@ class DunlinBehaviorModelTrainer:
         self.img_width = 180
 
     def make_train_val_ds(self):
+        """
+        spits the data set into a training and a validation set
+        :return train_ds: tf.data.Dataset object with training data set
+        :return val_ds: tf.data.Dataset object with validation data set
+        """
         train_ds = tf.keras.utils.image_dataset_from_directory(
             self.data_dir,
             validation_split=0.2,
@@ -44,7 +52,13 @@ class DunlinBehaviorModelTrainer:
         return train_ds, val_ds
 
     def train(self, train_ds, val_ds):
-        logging.debug("in train func")
+        """
+        trains a image classification model
+        :param train_ds: tf.data.Dataset object with training data set
+        :param val_ds: tf.data.Dataset object with validation data set
+        :return:
+        """
+        logging.debug("training classification model...")
 
         class_names = train_ds.class_names
         print(class_names)
@@ -68,19 +82,14 @@ class DunlinBehaviorModelTrainer:
         normalized_ds = train_ds.map(lambda x, y: (normalization_layer(x), y))
         logging.debug("image batch")
         image_batch, labels_batch = next(iter(normalized_ds))
-        logging.debug("first image")
-        first_image = image_batch[0]
-        # Notice the pixel values are now in `[0,1]`.
-        print(np.min(first_image), np.max(first_image))
 
         num_classes = len(class_names)
 
         logging.debug("setup model")
         model = Sequential([
-
+            # TODO add more preprocessing layers
             layers.Rescaling(1. / 255, input_shape=(self.img_height, self.img_width, 3)),
             keras.layers.RandomFlip("horizontal"),
-            # keras.layers.RandomContrast(0.2),
             layers.Conv2D(16, 3, padding='same', activation='relu'),
             layers.MaxPooling2D(),
             layers.Conv2D(32, 3, padding='same', activation='relu'),
@@ -91,14 +100,17 @@ class DunlinBehaviorModelTrainer:
             layers.Dense(128, activation='relu'),
             layers.Dense(num_classes)
         ])
+
         logging.info("compile model")
         model.compile(optimizer='adam',
                       loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
                       metrics=['accuracy'])
+
         logging.info("display model summary")
         model.summary()
 
-        epochs = 100
+        # amount of epochs (change if needed)
+        epochs = 10
         logging.debug(f"amount of epochs = {epochs}")
 
         history = model.fit(
@@ -113,25 +125,29 @@ class DunlinBehaviorModelTrainer:
         loss = history.history['loss']
         val_loss = history.history['val_loss']
 
+        # get amount of epochs for plotting
         epochs_range = range(epochs)
 
+        # make a plot to show accuracy during training
         plt.figure(figsize=(8, 8))
         plt.subplot(1, 2, 1)
         plt.plot(epochs_range, acc, label='Training Accuracy')
         plt.plot(epochs_range, val_acc, label='Validation Accuracy')
         plt.legend(loc='lower right')
+        # save plot
         plt.title('Training and Validation Accuracy')
 
+        # make a plot to show loss during training
         plt.subplot(1, 2, 2)
         plt.plot(epochs_range, loss, label='Training Loss')
         plt.plot(epochs_range, val_loss, label='Validation Loss')
         plt.legend(loc='upper right')
         plt.title('Training and Validation Loss')
-        plt.savefig('random_bright_traning_set.png')
+        # save plot
+        plt.savefig('3_classes_epoch_10_v2.png')
 
-        # Convert the model.
-        converter = tf.lite.TFLiteConverter.from_keras_model(model)
-        tflite_model = converter.convert()
+        # save model
+        model.save('test_model.keras')
 
         model.save('brigt_model.keras')
 
@@ -140,11 +156,12 @@ class DunlinBehaviorModelTrainer:
             f.write(tflite_model)
 
 def main():
+    # call class
     dbm = DunlinBehaviorModelTrainer()
+    # train test split
     train_ds, val_ds = dbm.make_train_val_ds()
+    # train model
     dbm.train(train_ds, val_ds)
-    print(train_ds)
-    print(val_ds)
 
 
 if __name__ == "__main__":
