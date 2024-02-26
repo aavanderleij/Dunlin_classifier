@@ -1,4 +1,23 @@
 """
+This is a script for training an image classifier
+training images should be structured like this:
+
+training_set/
+│
+├── foraging/
+│   ├── img1.jpg
+│   ├── img2.jpg
+│   ├── ...
+│
+├── not_foraging/
+│   ├── img3.jpg
+│   ├── img4.jpg
+│   ├── ...
+│
+└── unknown/
+    ├── img5.jpg
+    ├── img6.jpg
+    ├── ...
 
 """
 
