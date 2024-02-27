@@ -30,6 +30,7 @@ class DunlinClassifier:
 
     def __init__(self):
         args = self.get_args()
+        #
         self.video_dir = args.video_dir
         self.frame_step = args.frame_step
 
@@ -98,7 +99,7 @@ class DunlinClassifier:
         :return:
         """
         # path to video
-        video = self.video_dir + video_name
+        video = self.video_dir + "/" + video_name
 
         logging.info(f"rescale videos are saved at: {self.rescale_output}")
 
