@@ -8,6 +8,7 @@ frames.
 Autor: Antsje van der Leij
 """
 import logging
+
 logging.basicConfig(level=logging.WARNING)
 
 import csv
@@ -16,6 +17,7 @@ import os
 import sys
 import argparse
 import numpy as np
+import shutil
 
 import subprocess
 import pandas as pd
@@ -30,23 +32,22 @@ class DunlinClassifier:
 
     def __init__(self):
         args = self.get_args()
-        #
-        self.video_dir = args.video_dir
+        self.video_dir = os.path.join(args.video_dir, "")
         self.frame_step = args.frame_step
 
         if args.output_dir:
             self.output_dir = args.output_dir
         else:
-            self.output_dir = self.video_dir + "output/"
+            self.output_dir = os.path.join(self.video_dir, "output/")
 
         # log argparse values
         logging.info(f"argparse video dir = {self.video_dir}")
         logging.info(f"argparse frame_step = {self.frame_step}")
         logging.info(f"argparse output_dir = {self.output_dir}")
 
-        self.rescale_output = self.output_dir + "rescaled/"
-        self.temp_dir = self.output_dir + "tmp/"
-        self.sleap_prediction_path = self.output_dir + "sleap_predictions/"
+        self.rescale_output = os.path.join(self.output_dir, "rescaled/")
+        self.temp_dir = os.path.join(self.output_dir, "tmp/")
+        self.sleap_prediction_path = os.path.join(self.output_dir, "sleap_predictions/")
 
         self.result_dict = dict()
 
@@ -73,11 +74,10 @@ class DunlinClassifier:
         :param file_extension: str
         :return: list of file names
         """
-        print("get files")
+        print("getting files")
 
         # check if file exists
         if not os.path.isdir(path):
-            print(path)
             sys.exit("File path to videos does not exist or is incorrect!")
 
         # get only one type of file
@@ -99,7 +99,7 @@ class DunlinClassifier:
         :return:
         """
         # path to video
-        video = self.video_dir + "/" + video_name
+        video = self.video_dir + video_name
 
         logging.info(f"rescale videos are saved at: {self.rescale_output}")
 
@@ -141,12 +141,12 @@ class DunlinClassifier:
         :return:
         """
         sleap_parser = SleapParser()
-        sleap_prediction_path = self.output_dir + "sleap_predictions/"
+        sleap_prediction_path = os.path.join(self.output_dir, "sleap_predictions/")
         for file in self.get_files_from_dir(sleap_prediction_path, ".slp"):
             if not os.path.isdir(self.output_dir + "sleap_csv/"):
-                os.makedirs(self.output_dir + "sleap_csv/")
+                os.makedirs(os.path.join(self.output_dir, "sleap_csv/"))
             df = sleap_parser.sleap_to_pandas(sleap_prediction_path + file)
-            df.to_csv(self.output_dir + "sleap_csv/" + file.replace(".slp", ".csv"))
+            df.to_csv(os.path.join(self.output_dir, "sleap_csv/", file.replace(".slp", ".csv")))
 
     # TODO function is way to long, needs work
     def crop_frame(self, video_name):
@@ -168,11 +168,15 @@ class DunlinClassifier:
         video_id = video_name.replace(".mp4", "")
 
         # get sleap dataframe
-        sleap_df = pd.read_csv(self.output_dir + "sleap_csv/" + video_id + ".csv")
+        sleap_df = pd.read_csv(os.path.join(self.output_dir, "sleap_csv/", video_id + ".csv"))
 
+        cropped_img_path = os.path.join(self.output_dir, "cropped_frames/", video_id + "/")
         # make dir for saving image
-        if not os.path.exists(self.output_dir + "cropped_frames/" + video_id + "/"):
-            os.makedirs(self.output_dir + "cropped_frames/" + video_id + "/")
+        if not os.path.exists(cropped_img_path):
+            os.makedirs(cropped_img_path)
+        else:
+            shutil.rmtree(cropped_img_path)
+            os.makedirs(cropped_img_path)
 
         # open video
         video = cv2.VideoCapture(video)
@@ -304,11 +308,11 @@ class DunlinClassifier:
                                                         fr"frame_{count}_{index}.jpg", crop_frame)
                             instance_dict["frame_crop_succes"] = write_success
                         except Exception as e:
-                            logging.error("crop frame borders sizes")
-                            logging.error(f"x start = {x_start}")
-                            logging.error(f"y start = {y_start}")
-                            logging.error(f"x end = {x_end}")
-                            logging.error(f"y end = {y_end}")
+                            logging.warning("crop frame borders sizes")
+                            logging.warning(f"x start = {x_start}")
+                            logging.warning(f"y start = {y_start}")
+                            logging.warning(f"x end = {x_end}")
+                            logging.warning(f"y end = {y_end}")
                             print(e)
                         # add sleap score to result dict
                         frame_dict[index] = instance_dict
@@ -343,7 +347,7 @@ class DunlinClassifier:
         video_dict = self.result_dict[video]
 
         # file were img to predict are stored
-        img_dir = self.output_dir + "cropped_frames/" + video_id
+        img_dir = os.path.join(self.output_dir, "cropped_frames/" + video_id)
 
         for img in self.get_files_from_dir(img_dir, ".jpg"):
 
@@ -456,7 +460,7 @@ class DunlinClassifier:
             print(video)
             self.crop_frame(video)
             self.run_keras(video)
-        print("writhing results...")
+        print("writing results...")
         self.write_results()
 
 
