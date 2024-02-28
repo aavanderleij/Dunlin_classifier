@@ -60,7 +60,8 @@ class DunlinClassifier:
         parser.add_argument('video_dir', help='path to the directory containing the videos to be tracked', type=str)
         parser.add_argument('-o', '--output_dir', help='path to the directory to store the csv output files',
                             type=str, default='')
-        parser.add_argument('-f', '--frame_step', help='only predict every n-th frame. Will reduce prediction time.',
+        parser.add_argument('-f', '--frame_step', help='only predict every n-th frame. Will reduce prediction time if'
+                                                       ' set to higher value. Set value to 1 to classify every frame',
                             type=int,
                             default=15)
 
