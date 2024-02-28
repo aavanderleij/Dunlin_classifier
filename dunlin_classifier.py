@@ -24,8 +24,8 @@ import pandas as pd
 import cv2
 import tensorflow as tf
 
-from dunlin_classifier.SLEAP_model import SLEAPModel
-from dunlin_classifier.SLEAP_parser import SleapParser
+from dunlinclassifier.SLEAP_model import SLEAPModel
+from dunlinclassifier.SLEAP_parser import SleapParser
 
 
 class DunlinClassifier:
@@ -61,7 +61,7 @@ class DunlinClassifier:
         parser.add_argument('-o', '--output_dir', help='path to the directory to store the csv output files',
                             type=str, default='')
         parser.add_argument('-f', '--frame_step', help='only predict every n-th frame. Will reduce prediction time if'
-                                                       ' set to higher value. Set value to 1 to classify every frame',
+                                                       ' set to higher value. Set value to 1 to ',
                             type=int,
                             default=15)
 
