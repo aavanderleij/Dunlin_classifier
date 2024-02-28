@@ -12,7 +12,7 @@ import logging
 import glob
 import subprocess
 import sleap
-from dunlin_classifier.SLEAP_parser import SleapParser
+from dunlinclassifier.SLEAP_parser import SleapParser
 
 
 class SLEAPModel:
