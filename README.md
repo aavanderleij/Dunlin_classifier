@@ -72,7 +72,7 @@ cd Dunlin_classifier
 make a new conda environment using the requirements.txt:
 
 ```bash
-conda create --name dunlin_classifier --file environment.yml
+conda env create --name dunlin_classifier --file environment.yml
 ```
 
 
