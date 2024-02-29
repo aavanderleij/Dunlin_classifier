@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 This is a script for training an image classifier
 training images should be structured like this:

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """
 Uses a model that was trained with SLEAP and uses it to estimate keypoint positions of the red knot in video's.
 

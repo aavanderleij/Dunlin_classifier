@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # TODO make stand alone exe
 """
 The Dunlin Classifier was developed for generating behaviour time-series from videos featuring dunlins.
