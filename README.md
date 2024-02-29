@@ -4,9 +4,9 @@
  This program focuses on automating the annotation process for studying the natural behavior of dunlins
  (Calidris alpina) in the Dutch Wadden Sea mudflats.
 
-The Dunlin classifier was developed as part of an internship at the Royal Netherlands Institute for Sea research (NIOZ)
+The Dunlin classifier was developed as part of an internship at the Royal Netherlands Institute for Sea research (NIOZ).
 
-The Dunlin Classifier is unfinished and still a work in progress. 
+The Dunlin Classifier is currently unfinished and still a work in progress. 
 
 
 ### Prerequisites
@@ -20,9 +20,9 @@ conda update -n base conda
 If you already have mamba you don't need to install anaconda or miniconda. To install the Dunlin classifier
 environment open mamba and replace `conda` with `mamba` when installing the Dunlin classifier environment.
 
-## Simple step-by-step installation
+## Simple step-by-step installation ###
 
-### Install Miniconda ###
+### Install Miniconda 
 
 Anaconda is a Python environment manager that makes it easy to install necessary dependencies without
 affecting other Python software on your computer.
@@ -118,6 +118,22 @@ python .\dunlin_classifier.py "c:\path\to\your\video_dir\location" -f 1
 ```
 
 
+## References ##
 
+### NIOZ
+
+The contributions of Evy Gobbens, Janna van Burik and Allert Bijleveld are gratefully acknowledged for providing
+ data and insights that contributed to the development and training of the models in this project.
+
+### SLEAP 
+
+SLEAP is an open source deep-learning based framework for multi-animal pose tracking (Pereira et al., Nature Methods,
+2022). It can be used to track any type or number of animals and includes an advanced labeling/training GUI for active
+learning and proofreading. SLEAP was one of the main libraries used in this project.
+
+T.D. Pereira, N. Tabris, A. Matsliah, D. M. Turner, J. Li, S. Ravindranath, E. S. Papadoyannis, E. Normand,
+D. S. Deutsch, Z. Y. Wang, G. C. McKenzie-Smith, C. C. Mitelut, M. D. Castro, J. D’Uva, M. Kislin, D. H. Sanes,
+S. D. Kocher, S. S-H, A. L. Falkner, J. W. Shaevitz, and M. Murthy. Sleap: A deep learning system for multi-animal pose
+tracking. Nature Methods, 19(4), 2022
 
 
