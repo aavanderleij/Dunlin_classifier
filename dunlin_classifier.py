@@ -9,7 +9,7 @@ Autor: Antsje van der Leij
 """
 import logging
 
-logging.basicConfig(level=logging.WARNING)
+logging.basicConfig(level=logging.ERROR)
 
 import csv
 # imports
